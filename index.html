@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamischer Cycling Coach</title>
+    
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --primary: #007bff;
+            --primary-hover: #0056b3;
+            --text-main: #333;
+            --text-muted: #666;
+            --border: #ddd;
+            --accent: #ff6b6b;
+            --race: #fd7e14;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1, h2, h3 { color: #111; margin-top: 0; }
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+        
+        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .header-title small { color: var(--primary); font-size: 0.6em; display: block; margin-top: 5px; }
+        .nav-buttons { display: flex; gap: 10px; }
+        
+        .form-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+        .form-group label { font-weight: 600; margin-bottom: 5px; font-size: 0.9em; }
+        .form-group input { padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 1em; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end; }
+        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1.5fr auto; gap: 15px; align-items: end; }
+        
+        button { background-color: var(--primary); color: white; border: none; padding: 10px 16px; font-size: 1em; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background-color: var(--primary-hover); }
+        .btn-small { padding: 6px 12px; font-size: 0.9em; background-color: #28a745; }
+        .btn-small:hover { background-color: #218838; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        .btn-delete { background-color: #dc3545; padding: 6px 12px; font-size: 0.9em; }
+        .btn-delete:hover { background-color: #c82333; }
+        
+        .event-list { list-style: none; padding: 0; margin-top: 15px; }
+        .event-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border: 1px solid var(--border); padding: 10px 15px; border-radius: 4px; margin-bottom: 10px; }
+
+        .update-bar { background: #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #ced4da; }
+        .wkg-display { font-size: 1.1em; font-weight: bold; color: var(--primary); margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc; text-align: right;}
+
+        .week-calendar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px; }
+        .week-card { min-width: 140px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .week-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .week-card.active { border: 2px solid var(--primary); background: #f0f7ff; box-shadow: 0 4px 8px rgba(0,123,255,0.1); }
+        .week-title { font-weight: bold; margin-bottom: 5px; font-size: 1.1em; }
+        .week-dates { font-size: 0.8em; color: var(--text-muted); }
+        .current-badge { display: inline-block; background: #28a745; color: white; font-size: 0.7em; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; font-weight: bold; }
+        .test-badge { display: inline-block; background: var(--accent); color: white; font-size: 0.7em; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; font-weight: bold; }
+        .race-badge { display: inline-block; background: var(--race); color: white; font-size: 0.7em; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; font-weight: bold; }
+
+        .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .day-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; position: relative; transition: transform 0.2s, box-shadow 0.2s; }
+        .day-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-color: var(--primary); }
+        .day-header { font-weight: bold; font-size: 1.1em; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+        .day-date { font-size: 0.8em; color: var(--text-muted); font-weight: normal; }
+        .day-type { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; background: #e9ecef; margin-bottom: 10px; }
+        .type-interval { background: #ffeeba; color: #856404; }
+        .type-endurance { background: #d4edda; color: #155724; }
+        .type-rest { background: #f8d7da; color: #721c24; }
+        .type-test { background: #ffcccb; color: #cc0000; }
+        .type-race { background: #ffe8d6; color: #d9480f; border: 2px solid var(--race); }
+        
+        .morning-check-btn {
+            background-color: #6c757d;
+            font-size: 0.8em;
+            padding: 4px 8px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .morning-check-btn.checked-green { background-color: #28a745; }
+        .morning-check-btn.checked-red { background-color: #dc3545; }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #fff; padding: 30px; border-radius: 8px; width: 90%; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; }
+        .close-btn { position: absolute; top: 15px; right: 20px; background: none; color: #333; font-size: 1.8em; padding: 0; line-height: 1; }
+        .workout-details ul { list-style: none; padding: 0; }
+        .workout-details li { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        
+        .nutrition-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px 15px; margin-top: 20px; border-radius: 0 4px 4px 0; font-size: 0.9em; }
+        .nutrition-box strong { color: #856404; display: block; margin-bottom: 5px; }
+
+        .log-section { margin-top: 25px; padding-top: 20px; border-top: 2px dashed var(--border); background: #f9fbff; padding: 20px; border-radius: 8px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-actions">
+        <h1 class="header-title">Dynamischer Cycling Coach <small id="plan-title-display">Neuer (ungespeicherter) Plan</small></h1>
+        <div class="nav-buttons">
+            <button class="btn-secondary" onclick="startNewPlan()">+ Neuer Plan</button>
+            <button class="btn-secondary" onclick="openPlanManager()">📁 Pläne laden</button>
+            <button onclick="savePlan()" id="btn-save" class="hidden">💾 Plan speichern</button>
+        </div>
+    </div>
+    
+    <!-- Setup Section -->
+    <div class="card" id="setup-section">
+        <h2>1. Basisdaten</h2>
+        <div class="grid-2">
+            <div class="form-group"><label>Aktuelle FTP (Watt)</label><input type="number" id="input-ftp" value="260"></div>
+            <div class="form-group"><label>Gewicht (kg)</label><input type="number" id="input-weight" value="86" step="0.1"></div>
+            <div class="form-group" style="grid-column: 1 / -1;"><label>Trainingsfreie Tage (Urlaub, Dienstreise etc.)</label><input type="text" id="input-restdates" placeholder="Kalender öffnen, um Tage zu markieren oder abzuwählen..." readonly></div>
+        </div>
+    </div>
+
+    <!-- Events Section -->
+    <div class="card" id="events-section">
+        <h2>2. Saison-Ziele / Events</h2>
+        <div class="grid-2" style="background: #f9f9f9; padding: 15px; border-radius: 6px; border: 1px solid #eee;">
+            <div class="form-group"><label>Bezeichnung</label><input type="text" id="event-name" placeholder="z.B. Mont Ventoux"></div>
+            <div class="form-group"><label>Datum</label><input type="text" id="event-date" placeholder="Wähle das Datum..." readonly></div>
+            <div class="form-group"><label>Strecke (km)</label><input type="number" id="event-dist" placeholder="z.B. 137"></div>
+            <div class="form-group"><label>Höhenmeter (hm)</label><input type="number" id="event-elev" placeholder="z.B. 4400"></div>
+            <div class="form-group" style="grid-column: 1 / -1;"><button class="btn-small" onclick="addEvent()">+ Event hinzufügen</button></div>
+        </div>
+        <ul class="event-list" id="event-list-container"></ul>
+        <button onclick="generatePlan()" style="margin-top: 20px; width: 100%; font-size: 1.1em; padding: 15px;">Trainingsplan (Dynamischer FTP-Aufbau) generieren</button>
+    </div>
+
+    <!-- Plan Section -->
+    <div class="card hidden" id="plan-section">
+        <h2>3. Dein Trainingsplan</h2>
+        
+        <div class="update-bar">
+            <h3 style="margin-top: 0; font-size: 1.1em;">Leistungs-Update & Anpassung</h3>
+            <div class="grid-4">
+                <div class="form-group" style="margin-bottom: 0;"><label>Neuer FTP (W)</label><input type="number" id="update-ftp" value=""></div>
+                <div class="form-group" style="margin-bottom: 0;"><label>Neues Gewicht (kg)</label><input type="number" id="update-weight" value="" step="0.1"></div>
+                <div class="form-group" style="margin-bottom: 0;"><label>Freie Tage anpassen</label><input type="text" id="update-restdates" placeholder="Tage markieren/abwählen..." readonly></div>
+                <div class="form-group" style="margin-bottom: 0;"><button onclick="applyUpdates()" style="background-color: #28a745;">Plan updaten</button></div>
+            </div>
+            <div class="wkg-display" id="wkg-display">Aktuelles Leistungsgewicht: -- W/kg</div>
+        </div>
+
+        <div id="week-calendar" class="week-calendar"></div>
+        <p style="color: var(--text-muted); margin-bottom: 15px;">Das System passt Ruhetage dynamisch an: Fällt durch deine Termine unter der Woche (z. B. Di/Mi) Training aus, wird der Freitag automatisch mit einer sinnvollen Einheit gefüllt, statt starr frei zu sein.</p>
+        <div class="plan-grid" id="plan-container"></div>
+    </div>
+</div>
+
+<!-- Plan Manager Modal -->
+<div class="modal-overlay" id="plan-manager-modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closePlanManager()">×</button>
+        <h2 style="margin-top:0;">Gespeicherte Trainingspläne</h2>
+        <ul id="saved-plans-list" class="event-list"></ul>
+    </div>
+</div>
+
+<!-- Workout Modal -->
+<div class="modal-overlay" id="workout-modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal()">×</button>
+        <h2 id="modal-title" style="margin-top:0;">Workout Details</h2>
+        <span id="modal-type" class="day-type"></span>
+        
+        <div class="workout-details" id="modal-details"></div>
+        <div id="modal-nutrition" class="nutrition-box hidden"></div>
+
+        <div class="log-section">
+            <h3 style="margin-top: 0;">Post-Workout Log (Wahoo / Strava)</h3>
+            <div class="grid-2">
+                <div class="form-group"><label>Normalized Power (NP in Watt)</label><input type="number" id="log-np" placeholder="z.B. 210"></div>
+                <div class="form-group"><label>Absolvierter TSS</label><input type="number" id="log-tss" placeholder="z.B. 95"></div>
+                <div class="form-group"><label>Avg Power (Watt)</label><input type="number" id="log-power" placeholder="z.B. 195"></div>
+                <div class="form-group"><label>RPE (Skala 1-10)</label><input type="number" id="log-rpe" placeholder="z.B. 7"></div>
+            </div>
+            <div class="form-group"><label>Bemerkung / Fahrgefühl</label><input type="text" id="log-notes" placeholder="Optional..."></div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="logWorkout()">Leistungsdaten speichern</button>
+                <button onclick="skipWorkout()" class="btn-delete">Training ausgefallen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flatpickr JS & Lokalisierung -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
+
+<script>
+    let currentPlanName = null;
+    let currentFtp = 260;
+    let currentWeight = 86;
+    let events = []; 
+    let allRestDatesSet = new Set();
+    let generatedWeeks = []; 
+    let activeWeekIndex = 0;
+    
+    let activeModalWeekIdx = null;
+    let activeModalDayIdx = null;
+
+    function getFormattedDate(dateObj) {
+        const y = dateObj.getFullYear(); 
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0'); 
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function updateGlobalRestDates(selectedDates) {
+        allRestDatesSet.clear();
+        selectedDates.forEach(d => allRestDatesSet.add(getFormattedDate(d)));
+    }
+
+    let isSyncing = false; 
+
+    const fpInit = flatpickr("#input-restdates", { 
+        mode: "multiple", dateFormat: "d.m.Y", locale: "de",
+        onChange: function(selectedDates) {
+            if(isSyncing) return;
+            isSyncing = true; updateGlobalRestDates(selectedDates); fpUpdate.setDate(selectedDates, true); isSyncing = false;
+        }
+    });
+
+    const fpUpdate = flatpickr("#update-restdates", { 
+        mode: "multiple", dateFormat: "d.m.Y", locale: "de",
+        onChange: function(selectedDates) {
+            if(isSyncing) return;
+            isSyncing = true; updateGlobalRestDates(selectedDates); fpInit.setDate(selectedDates, true); isSyncing = false;
+        }
+    });
+
+    flatpickr("#event-date", { dateFormat: "d.m.Y", locale: "de" });
+
+    function syncCalendars() {
+        const dateObjects = Array.from(allRestDatesSet).map(ds => new Date(ds + 'T00:00:00'));
+        isSyncing = true;
+        fpInit.setDate(dateObjects, true);
+        fpUpdate.setDate(dateObjects, true);
+        isSyncing = false;
+    }
+
+    function updateWkgDisplay() {
+        if(currentWeight > 0) {
+            const wkg = (currentFtp / currentWeight).toFixed(2);
+            document.getElementById('wkg-display').innerText = `🏆 Aktuelles Leistungsgewicht: ${wkg} W/kg`;
+        }
+    }
+
+    // --- TEMPLATES ---
+    const buildWeek = [
+        { dayName: 'Montag', type: 'Rest', title: 'Ruhetag', duration: '-', tss: 0, details: [], nutrition: "Ausreichend trinken." },
+        { dayName: 'Dienstag', type: 'Interval', title: 'VO2 Max Intervalle', duration: '1h 15m', tss: 85, 
+          details: [ { phase: 'Aufwärmen', time: '15 min', target: 'Zone 1/2', cadence: '90-95 rpm' }, { phase: 'Hauptteil', time: '5 x 3 min', target: '110-115% FTP', cadence: '95+ rpm' }, { phase: 'Cool Down', time: '15 min', target: 'Zone 1', cadence: '85-90 rpm' } ],
+          nutrition: "Vorab: 1 MNSTRY Gel. Währenddessen: 1 Flasche mit MNSTRY Power Carb. Ggf. 1 SaltStick Cap."
+        },
+        { dayName: 'Mittwoch', type: 'Endurance', title: 'Grundlagen Ausdauer (LIT)', duration: '2h 00m', tss: 90,
+          details: [{ phase: 'Konstante Fahrt', time: '2h', target: '65-75% FTP', cadence: '85-95 rpm' }],
+          nutrition: "Moderate Carb-Zufuhr. Wasser + 1-2 SaltStick Caps/Stunde."
+        },
+        { dayName: 'Donnerstag', type: 'Interval', title: 'Sweetspot Tempo', duration: '1h 30m', tss: 95,
+          details: [ { phase: 'Aufwärmen', time: '20 min', target: 'Zone 2', cadence: '90 rpm' }, { phase: 'Hauptteil', time: '3 x 15 min', target: '88-93% FTP', cadence: '85-90 rpm' }, { phase: 'Cool Down', time: '15 min', target: 'Zone 1', cadence: 'frei' } ],
+          nutrition: "1 Flasche mit MNSTRY Power Carb + SaltStick Caps."
+        },
+        // Freitag wird dynamisch geprüft: Ist frei, es sei denn unter der Woche fiel Training aus!
+        { dayName: 'Freitag', type: 'Rest', title: 'Aktive Erholung / Ruhetag', duration: '-', tss: 0,
+          details: [], nutrition: "Erholungstag vor der langen Ausfahrt."
+        },
+        { dayName: 'Samstag', type: 'Endurance', title: 'Lange Ausfahrt', duration: '3h 30m', tss: 170,
+          details: [{ phase: 'Ausdauer', time: '3h 30m', target: '60-70% FTP', cadence: '85-90 rpm' }],
+          nutrition: "High-Carb Fokus: 60-90g Carbs/Stunde! MNSTRY Power Carb + Gels + SaltStick."
+        },
+        { dayName: 'Sonntag', type: 'Endurance', title: 'Recovery Ride', duration: '1h', tss: 30, 
+          details: [{ phase: 'Kaffeefahrt', time: '1h', target: 'Zone 1', cadence: 'frei' }], nutrition: "Nur Wasser." }
+    ];
+
+    const testWeek = [
+        { dayName: 'Montag', type: 'Rest', title: 'Ruhetag', duration: '-', tss: 0, details: [], nutrition: "Erholung!" },
+        { dayName: 'Dienstag', type: 'Interval', title: 'Beine wecken (Openers)', duration: '1h', tss: 45, 
+          details: [ { phase: 'Aufwärmen', time: '30 min', target: 'Zone 1', cadence: '90 rpm' }, { phase: 'Sprints', time: '3 x 30 sec', target: '150% FTP', cadence: '100+ rpm' }, { phase: 'Cool Down', time: '25 min', target: 'Zone 1', cadence: '85 rpm' } ],
+          nutrition: "Wasser."
+        },
+        { dayName: 'Mittwoch', type: 'Endurance', title: 'Locker LIT', duration: '1h 00m', tss: 30,
+          details: [{ phase: 'Konstante Fahrt', time: '1h', target: '55-65% FTP', cadence: '90 rpm' }], nutrition: "Nur Wasser."
+        },
+        { dayName: 'Donnerstag', type: 'Interval', title: 'Pre-Test Aktivierung', duration: '45m', tss: 35,
+          details: [ { phase: 'Locker', time: '30 min', target: 'Zone 1', cadence: '90 rpm' }, { phase: 'Tempo', time: '2 x 2 min', target: '95% FTP', cadence: '90 rpm' } ], nutrition: "Wasser."
+        },
+        { dayName: 'Freitag', type: 'Rest', title: 'Ruhetag vor Test', duration: '-', tss: 0, details: [], nutrition: "Carb-Speicher füllen." },
+        { dayName: 'Samstag', type: 'Test', title: 'Wahoo Ramp Test / 20-Min Test', duration: '1h 15m', tss: 85,
+          details: [{ phase: 'Warmup Protocol', time: '20 min', target: 'Aufbauend', cadence: '90 rpm' }, { phase: 'ALL OUT TEST', time: '20 min', target: 'MAXIMAL', cadence: '90-100 rpm' }, { phase: 'Ausfahren', time: '20 min', target: 'Zone 1', cadence: 'frei' }],
+          nutrition: "1 Flasche MNSTRY Power Carb. 1 MNSTRY Gel vor dem Test!"
+        },
+        { dayName: 'Sonntag', type: 'Endurance', title: 'Belohnungs-Ausfahrt', duration: '2h', tss: 80, 
+          details: [{ phase: 'Genießen', time: '2h', target: 'Zone 1/2', cadence: 'frei' }], nutrition: "Wasser, SaltStick Caps." }
+    ];
+
+    window.onload = function() {
+        if(localStorage.getItem('cyclingPlans')) document.getElementById('btn-load').style.display = 'inline-block';
+    };
+
+    function addEvent() {
+        const name = document.getElementById('event-name').value;
+        const dateStr = document.getElementById('event-date').value; // DD.MM.YYYY
+        const dist = parseFloat(document.getElementById('event-dist').value) || 0;
+        const elev = parseFloat(document.getElementById('event-elev').value) || 0;
+
+        if (!name || !dateStr) return alert("Bitte Name und Datum ausfüllen.");
+        
+        const parts = dateStr.split('.');
+        const isoDateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+        events.push({ 
+            name: name, 
+            dateStr: dateStr, 
+            isoDate: isoDateStr, 
+            dist: dist, 
+            elev: elev, 
+            parsedTime: new Date(parts[2], parts[1]-1, parts[0]).getTime() 
+        });
+        events.sort((a, b) => a.parsedTime - b.parsedTime);
+        
+        document.getElementById('event-name').value = ''; document.getElementById('event-date').value = '';
+        document.getElementById('event-dist').value = ''; document.getElementById('event-elev').value = '';
+        renderEvents();
+    }
+    
+    function renderEvents() {
+        const container = document.getElementById('event-list-container');
+        container.innerHTML = '';
+        events.forEach((ev, index) => {
+            container.innerHTML += `<li class="event-item"><div class="event-info"><strong>${ev.dateStr}</strong> — ${ev.name} (${ev.dist} km, ${ev.elev} hm)</div><button class="btn-delete" onclick="events.splice(${index}, 1); renderEvents();">Löschen</button></li>`;
+        });
+    }
+
+    function calculatePlanData() {
+        generatedWeeks = [];
+        
+        let startDate = new Date();
+        startDate.setHours(0,0,0,0);
+        let dayOfWeek = startDate.getDay() || 7; 
+        if (dayOfWeek !== 1) startDate.setDate(startDate.getDate() + (8 - dayOfWeek)); 
+
+        let totalWeeks = 16; 
+        if (events.length > 0) {
+            const timeDiff = events[0].parsedTime - startDate.getTime();
+            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            if (daysDiff > 0) totalWeeks = Math.ceil(daysDiff / 7);
+        }
+
+        let currentDate = new Date(startDate.getTime());
+        let effectiveBuildWeeks = 0; 
+
+        for (let w = 0; w < totalWeeks; w++) {
+            let weekDays = [];
+            let weekStartDateStr = getFormattedDate(currentDate);
+            
+            let eventInThisWeek = events.find(ev => {
+                let evTime = ev.parsedTime;
+                let wStart = new Date(currentDate.getTime()).setHours(0,0,0,0);
+                let wEnd = new Date(currentDate.getTime());
+                wEnd.setDate(wEnd.getDate() + 7);
+                let wEndTime = wEnd.setHours(23,59,59,999);
+                return evTime >= wStart && evTime <= wEndTime;
+            });
+
+            // 1. Zuerst prüfen, wie viele Tage in dieser Woche vom Nutzer blockiert wurden (Di-Do)
+            let weekCheckDate = new Date(currentDate.getTime());
+            let userRestDaysInWeek = 0;
+            for (let i = 0; i < 7; i++) {
+                if (allRestDatesSet.has(getFormattedDate(weekCheckDate))) {
+                    if (i > 0 && i < 4) { // Di (1), Mi (2), Do (3)
+                        userRestDaysInWeek++;
+                    }
+                }
+                weekCheckDate.setDate(weekCheckDate.getDate() + 1);
+            }
+
+            let isTestWeek = (!eventInThisWeek && effectiveBuildWeeks >= 3);
+            let testDate = new Date(currentDate.getTime());
+            testDate.setDate(testDate.getDate() + 5); 
+            let isTestDayBlocked = allRestDatesSet.has(getFormattedDate(testDate));
+            if (isTestWeek && isTestDayBlocked) isTestWeek = false; 
+
+            let activeTemplate = isTestWeek ? testWeek : JSON.parse(JSON.stringify(buildWeek));
+
+            // DYNAMISCHE ANPASSUNG DES FREITAGS:
+            // Wenn der Nutzer unter der Woche (Di-Do) bereits 2 oder mehr Tage nicht trainieren kann,
+            // macht der Ruhetag am Freitag keinen Sinn mehr -> Freitag wird zur Grundlageneinheit!
+            if (!isTestWeek && !eventInThisWeek && userRestDaysInWeek >= 2) {
+                activeTemplate[4] = { 
+                    dayName: 'Freitag', type: 'Endurance', title: 'Ersatz-Ausfahrt (Ausgleich)', duration: '1h 30m', tss: 65,
+                    details: [{ phase: 'Lockeres Grundlagenfahren', time: '1h 30m', target: '60-70% FTP', cadence: '90 rpm' }],
+                    nutrition: "Wasser + 1 SaltStick Cap."
+                };
+            }
+
+            let activeTrainingDaysThisWeek = 0;
+
+            for (let d = 0; d < 7; d++) {
+                const dateStrForCheck = getFormattedDate(currentDate); // YYYY-MM-DD
+                const isRestDay = allRestDatesSet.has(dateStrForCheck);
+                
+                let dayData = JSON.parse(JSON.stringify(activeTemplate[d]));
+                dayData.dateString = dateStrForCheck;
+                dayData.displayDate = currentDate.toLocaleDateString('de-DE'); // DD.MM.YYYY
+                dayData.morningCheck = dayData.morningCheck || null;
+
+                if (eventInThisWeek) {
+                    let evTime = eventInThisWeek.parsedTime;
+                    let currTime = new Date(currentDate.getTime()).setHours(0,0,0,0);
+                    let diffDays = Math.round((evTime - currTime) / (1000 * 3600 * 24));
+
+                    if (diffDays > 0 && diffDays <= 5) {
+                        dayData.type = 'Endurance';
+                        dayData.title = `Tapering (T-${diffDays})`;
+                        dayData.duration = diffDays % 2 === 0 ? '45 min Aktivierung' : '1h Ruheschub';
+                        dayData.tss = 30;
+                        dayData.details = [{ phase: 'Lockerer Beine-Ausschüttel-Ride', time: 'Fokus', target: 'Zone 1', cadence: '90 rpm' }];
+                        dayData.nutrition = "Viel trinken, Kohlenhydratspeicher laden.";
+                    } else if (diffDays < 0) {
+                        dayData.type = 'Rest';
+                        dayData.title = 'Regeneration nach Event';
+                        dayData.duration = '-';
+                        dayData.tss = 0;
+                        dayData.details = [];
+                    }
+                }
+
+                // Event-Tag Match
+                let matchingEvent = events.find(ev => ev.isoDate === dateStrForCheck || ev.dateStr === dayData.displayDate);
+                if (matchingEvent) {
+                    dayData.type = 'Race';
+                    dayData.title = `🏁 ${matchingEvent.name}`;
+                    dayData.duration = `ca. ${Math.max(2, Math.round(matchingEvent.dist / 25))}h`;
+                    dayData.tss = Math.min(350, Math.round((matchingEvent.dist / 8) + (matchingEvent.elev / 80)));
+                    
+                    let targetIntensity = matchingEvent.elev > 2500 ? "68-72% FTP (Bergpacing)" : "75-80% FTP (Gleichmäßig)";
+                    let targetWatts = Math.round((matchingEvent.elev > 2500 ? 0.70 : 0.77) * currentFtp);
+
+                    dayData.details = [
+                        { phase: 'Rennstart / Pacing', time: 'Ganze Fahrt', target: targetIntensity, cadence: '85-95 rpm' },
+                        { phase: 'Ziel-Durchschnittswatt', time: 'Fokus', target: `~ ${targetWatts} Watt`, cadence: 'Konstant dosieren' }
+                    ];
+                    dayData.nutrition = `Renn-Verpflegung (${matchingEvent.dist} km, ${matchingEvent.elev} hm): 80-90g Kohlenhydrate/Stunde! MNSTRY Power Carb in Flaschen + 1 MNSTRY Gel alle 30-45 Min. 2 SaltStick Caps/Stunde.`;
+                }
+
+                if (isRestDay && dayData.type !== 'Race') {
+                    dayData.type = 'Rest'; dayData.title = 'Blockiert / Urlaub'; dayData.duration = '-'; dayData.tss = 0; dayData.details = []; dayData.nutrition = '';
+                } else if (dayData.type !== 'Rest' && dayData.type !== 'Race') {
+                    activeTrainingDaysThisWeek++;
+                }
+
+                weekDays.push(dayData);
+                currentDate.setDate(currentDate.getDate() + 1); 
+            }
+            
+            if (eventInThisWeek) {
+                effectiveBuildWeeks = 0; 
+            } else if (isTestWeek) {
+                effectiveBuildWeeks = 0; 
+            } else if (activeTrainingDaysThisWeek >= 3) {
+                effectiveBuildWeeks++;
+            }
+
+            let weekEndDateStr = getFormattedDate(new Date(currentDate.getTime() - 86400000));
+            generatedWeeks.push({ weekNum: w + 1, isTestWeek: isTestWeek, isEventWeek: !!eventInThisWeek, days: weekDays, startDate: weekStartDateStr, endDate: weekEndDateStr });
+        }
+    }
+
+    function generatePlan() {
+        currentFtp = parseInt(document.getElementById('input-ftp').value) || 260;
+        currentWeight = parseFloat(document.getElementById('input-weight').value) || 86;
+        
+        document.getElementById('update-ftp').value = currentFtp;
+        document.getElementById('update-weight').value = currentWeight;
+        
+        calculatePlanData();
+        updateWkgDisplay();
+        showPlanUI();
+        document.getElementById('btn-save').classList.remove('hidden');
+    }
+
+    function applyUpdates() {
+        const newFtp = parseInt(document.getElementById('update-ftp').value);
+        if(newFtp) currentFtp = newFtp;
+        const newWeight = parseFloat(document.getElementById('update-weight').value);
+        if(newWeight) currentWeight = newWeight;
+        
+        document.getElementById('input-ftp').value = currentFtp;
+        document.getElementById('input-weight').value = currentWeight;
+
+        calculatePlanData();
+        updateWkgDisplay();
+        showPlanUI();
+        
+        if(currentPlanName) {
+            saveToStorage(); 
+            alert("Plan aktualisiert und gespeichert!");
+        } else {
+            alert("Plan aktualisiert. Bitte klicke auf 'Plan speichern'.");
+        }
+    }
+
+    function showPlanUI() {
+        document.getElementById('plan-section').classList.remove('hidden');
+        renderWeekCalendar();
+        renderSelectedWeek(activeWeekIndex || 0); 
+    }
+
+    function renderWeekCalendar() {
+        const container = document.getElementById('week-calendar');
+        container.innerHTML = '';
+        const todayStr = getFormattedDate(new Date());
+
+        generatedWeeks.forEach((week, i) => {
+            const isCurrentWeek = (todayStr >= week.startDate && todayStr <= week.endDate);
+            if(isCurrentWeek && activeWeekIndex === 0) activeWeekIndex = i; 
+            
+            let label = `Woche ${week.weekNum}`;
+            let badge = '';
+            if(week.isEventWeek) { badge = `<br><span class="race-badge">🏁 Event-Woche</span>`; }
+            else if(week.isTestWeek) { badge = `<br><span class="test-badge">Test-Woche</span>`; }
+            else if(i === generatedWeeks.length - 1 && events.length > 0) label += " (Race!)";
+
+            const card = document.createElement('div');
+            card.className = `week-card ${isCurrentWeek ? 'current' : ''}`;
+            card.onclick = () => renderSelectedWeek(i);
+            card.id = `week-card-${i}`;
+
+            let badgeHtml = isCurrentWeek ? `<span class="current-badge">Aktuelle Woche</span>` : '';
+            card.innerHTML = `${badgeHtml} ${badge}<div class="week-title">${label}</div><div class="week-dates">${week.startDate.split('-').reverse().slice(0,2).join('.')} - ${week.endDate.split('-').reverse().slice(0,2).join('.')}</div>`;
+            container.appendChild(card);
+        });
+    }
+
+    function renderSelectedWeek(weekIndex) {
+        activeWeekIndex = weekIndex;
+        document.querySelectorAll('.week-card').forEach(el => el.classList.remove('active'));
+        const activeCard = document.getElementById(`week-card-${weekIndex}`);
+        if(activeCard) activeCard.classList.add('active');
+
+        const weekData = generatedWeeks[weekIndex];
+        const container = document.getElementById('plan-container');
+        container.innerHTML = '';
+        
+        if(!weekData) return;
+        weekData.days.forEach((day, dayIndex) => {
+            const card = document.createElement('div');
+            card.className = 'day-card';
+            let typeClass = `type-${day.type.toLowerCase()}`;
+
+            let checkBtnClass = "morning-check-btn";
+            let checkBtnText = "☀️ Morgen-Check (WHOOP)";
+            if(day.morningCheck !== null) {
+                if(day.morningCheck >= 67) { checkBtnClass += " checked-green"; checkBtnText = `🟢 WHOOP: ${day.morningCheck}%`; }
+                else if(day.morningCheck < 33) { checkBtnClass += " checked-red"; checkBtnText = `🔴 WHOOP: ${day.morningCheck}%`; }
+                else { checkBtnText = `🟡 WHOOP: ${day.morningCheck}%`; }
+            }
+
+            card.innerHTML = `
+                <div class="day-header"><span>${day.dayName}</span><span class="day-date">${day.displayDate}</span></div>
+                <span class="day-type ${typeClass}">${day.type.toUpperCase()}</span>
+                <div style="font-weight: bold; margin-bottom: 5px;">${day.title}</div>
+                <div style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 10px;">Dauer: ${day.duration} <br>TSS: ${day.tss}</div>
+                <button class="${checkBtnClass}" onclick="event.stopPropagation(); promptMorningCheck(${weekIndex}, ${dayIndex})">${checkBtnText}</button>
+            `;
+            card.onclick = () => openModal(weekIndex, dayIndex);
+            container.appendChild(card);
+        });
+    }
+
+    function promptMorningCheck(weekIdx, dayIdx) {
+        const day = generatedWeeks[weekIdx].days[dayIdx];
+        const val = prompt(`Gib deine WHOOP Recovery für ${day.dayName} (${day.displayDate}) in % ein:`, day.morningCheck || "75");
+        if(val === null) return;
+        const recovery = parseInt(val);
+        if(isNaN(recovery) || recovery < 0 || recovery > 100) return alert("Bitte gib einen gültigen Wert zwischen 0 und 100 ein.");
+
+        day.morningCheck = recovery;
+
+        if(recovery < 33 && (day.type === 'Interval' || day.type === 'Test')) {
+            alert(`🚨 WHOOP Recovery bei ${recovery}% (Rot).\nDer Coach hat reagiert: Die harte Einheit heute wurde automatisch in einen 'Active Recovery Ride' umgewandelt!`);
+            day.type = 'Rest';
+            day.title = 'WHOOP Zwangspause (Active Recovery)';
+            day.details = [{ phase: 'Lockeres Kurbeln', time: '45 min', target: '< 50% FTP', cadence: 'frei' }];
+            day.tss = 20;
+            day.duration = '45m';
+            day.nutrition = "Viel Wasser, antientzündliche Ernährung.";
+        } else {
+            alert(`Morgen-Check gespeichert (${recovery}%).`);
+        }
+
+        if(currentPlanName) saveToStorage();
+        renderSelectedWeek(weekIdx);
+    }
+
+    function openModal(weekIdx, dayIdx) {
+        activeModalWeekIdx = weekIdx;
+        activeModalDayIdx = dayIdx;
+        
+        const day = generatedWeeks[weekIdx].days[dayIdx];
+        document.getElementById('modal-title').innerText = `${day.dayName}, ${day.displayDate} - ${day.title}`;
+        document.getElementById('modal-type').className = `day-type type-${day.type.toLowerCase()}`;
+        document.getElementById('modal-type').innerText = day.type.toUpperCase();
+
+        const detailsContainer = document.getElementById('modal-details');
+        if(day.details.length === 0) {
+            detailsContainer.innerHTML = '<p>Erholungstag. Beine hochlegen!</p>';
+        } else {
+            let html = '<ul>';
+            day.details.forEach(d => {
+                const watts = d.target.includes('%') ? (function(p, f){ 
+                    const m = p.match(/(\d+)-?(\d*)%/); 
+                    if(m){ let w1=Math.round(parseInt(m[1])/100*f); let w2=Math.round(parseInt(m[2]||m[1])/100*f); return w2>w1?`${w1}-${w2} W`:`~${w1} W`; } return p;
+                })(d.target, currentFtp) : d.target;
+                html += `<li><div><strong>${d.phase}</strong> (${d.time})<br><span style="color:#666;font-size:0.9em;">RPM: ${d.cadence}</span></div><div style="text-align:right;font-weight:bold;color:var(--primary);">${d.target}<br><span style="font-size:0.85em;color:#555;">${watts}</span></div></li>`;
+            });
+            detailsContainer.innerHTML = html + '</ul>';
+        }
+
+        const nutritionBox = document.getElementById('modal-nutrition');
+        if(day.nutrition) {
+            nutritionBox.innerHTML = `<strong>⛽ Verpflegungsstrategie:</strong> ${day.nutrition}`;
+            nutritionBox.classList.remove('hidden');
+        } else {
+            nutritionBox.classList.add('hidden');
+        }
+
+        document.getElementById('log-np').value = '';
+        document.getElementById('log-tss').value = '';
+        document.getElementById('log-power').value = '';
+        document.getElementById('log-rpe').value = '';
+        document.getElementById('log-notes').value = '';
+
+        document.getElementById('workout-modal').style.display = 'flex';
+    }
+    
+    function closeModal() { document.getElementById('workout-modal').style.display = 'none'; }
+    
+    function logWorkout() { 
+        const tss = document.getElementById('log-tss').value;
+        if(!tss) return alert("Bitte trage mindestens den absolvierten TSS ein.");
+        alert("Leistungsdaten erfolgreich gespeichert!");
+        if(currentPlanName) saveToStorage(); 
+        closeModal(); 
+    }
+    
+    function skipWorkout() { 
+        alert("Training als ausgefallen markiert."); 
+        if(currentPlanName) saveToStorage(); 
+        closeModal(); 
+    }
+
+    function startNewPlan() {
+        currentPlanName = null; currentFtp = 260; currentWeight = 86; events = []; allRestDatesSet.clear(); generatedWeeks = [];
+        document.getElementById('input-ftp').value = 260; document.getElementById('update-ftp').value = 260;
+        document.getElementById('input-weight').value = 86; document.getElementById('update-weight').value = 86;
+        fpInit.clear(); fpUpdate.clear(); renderEvents();
+        document.getElementById('plan-title-display').innerText = 'Neuer (ungespeicherter) Plan';
+        document.getElementById('plan-section').classList.add('hidden'); document.getElementById('btn-save').classList.add('hidden');
+    }
+
+    function savePlan() {
+        if (!currentPlanName) {
+            const name = prompt("Bitte gib einen Namen für diesen Trainingsplan ein:");
+            if (!name || name.trim() === "") return;
+            currentPlanName = name.trim();
+        }
+        saveToStorage();
+        alert(`Plan "${currentPlanName}" gespeichert!`);
+    }
+
+    function saveToStorage() {
+        let plans = JSON.parse(localStorage.getItem('cyclingPlans') || '{}');
+        plans[currentPlanName] = { ftp: currentFtp, weight: currentWeight, events: events, restDates: Array.from(allRestDatesSet), generatedWeeks: generatedWeeks };
+        localStorage.setItem('cyclingPlans', JSON.stringify(plans));
+        document.getElementById('plan-title-display').innerText = `- ${currentPlanName}`;
+    }
+
+    function openPlanManager() {
+        let plans = JSON.parse(localStorage.getItem('cyclingPlans') || '{}');
+        let ul = document.getElementById('saved-plans-list');
+        ul.innerHTML = '';
+        const planNames = Object.keys(plans);
+        if(planNames.length === 0) {
+            ul.innerHTML = '<p style="color:var(--text-muted);">Keine gespeicherten Pläne gefunden.</p>';
+        } else {
+            planNames.forEach(name => {
+                const li = document.createElement('li'); li.className = 'event-item';
+                li.innerHTML = `<strong>${name}</strong> <div><button class="btn-small" onclick="loadPlan('${name}')">Laden</button> <button class="btn-delete" onclick="deletePlan('${name}')">Löschen</button></div>`;
+                ul.appendChild(li);
+            });
+        }
+        document.getElementById('plan-manager-modal').style.display = 'flex';
+    }
+
+    function closePlanManager() { document.getElementById('plan-manager-modal').style.display = 'none'; }
+
+    function loadPlan(name) {
+        let plans = JSON.parse(localStorage.getItem('cyclingPlans') || '{}');
+        let data = plans[name];
+        if(!data) return;
+        currentPlanName = name; 
+        currentFtp = data.ftp || 260; 
+        currentWeight = data.weight || 86; 
+        
+        events = (data.events || []).map(ev => ({
+            name: ev.name,
+            dateStr: ev.dateStr,
+            isoDate: ev.isoDate,
+            dist: parseFloat(ev.dist) || 0,
+            elev: parseFloat(ev.elev) || 0,
+            parsedTime: ev.parsedTime || new Date(ev.isoDate + 'T00:00:00').getTime()
+        }));
+
+        allRestDatesSet = new Set(data.restDates || []); 
+        syncCalendars();
+        
+        generatedWeeks = data.generatedWeeks || [];
+        
+        document.getElementById('input-ftp').value = currentFtp; 
+        document.getElementById('update-ftp').value = currentFtp;
+        document.getElementById('input-weight').value = currentWeight; 
+        document.getElementById('update-weight').value = currentWeight;
+        document.getElementById('plan-title-display').innerText = `- ${currentPlanName}`;
+        
+        renderEvents(); 
+        updateWkgDisplay(); 
+        closePlanManager(); 
+        showPlanUI(); 
+        document.getElementById('btn-save').classList.add('hidden'); // Erst bei Änderung speichern
+        
+        let todayStr = getFormattedDate(new Date()); activeWeekIndex = 0;
+        generatedWeeks.forEach((w, i) => { if(todayStr >= w.startDate && todayStr <= w.endDate) activeWeekIndex = i; });
+        renderSelectedWeek(activeWeekIndex);
+    }
+
+    function deletePlan(name) {
+        if(confirm(`Trainingsplan "${name}" löschen?`)) {
+            let plans = JSON.parse(localStorage.getItem('cyclingPlans') || '{}');
+            delete plans[name]; localStorage.setItem('cyclingPlans', JSON.stringify(plans));
+            if(currentPlanName === name) startNewPlan();
+            openPlanManager(); 
+        }
+    }
+</script>
+
+</body>
+</html>
