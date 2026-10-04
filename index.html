@@ -44,7 +44,7 @@
         
         .form-group { display: flex; flex-direction: column; margin-bottom: 15px; }
         .form-group label { font-weight: 600; margin-bottom: 5px; font-size: 0.9em; }
-        .form-group input { padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 1em; }
+        .form-group input, .form-group textarea { padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 1em; font-family: inherit; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end; }
         .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1.5fr auto; gap: 15px; align-items: end; }
@@ -59,7 +59,7 @@
         .btn-delete:hover { background-color: #c82333; }
         
         .event-list { list-style: none; padding: 0; margin-top: 15px; }
-        .event-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border: 1px solid var(--border); padding: 10px 15px; border-radius: 4px; margin-bottom: 10px; }
+        .event-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border: 1px solid var(--border); padding: 10px 15px; border-radius: 4px; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
 
         .update-bar { background: #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #ced4da; }
         .wkg-display { font-size: 1.1em; font-weight: bold; color: var(--primary); margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc; text-align: right;}
@@ -172,6 +172,15 @@
     <div class="modal-content">
         <button class="close-btn" onclick="closePlanManager()">×</button>
         <h2 style="margin-top:0;">Gespeicherte Trainingspläne</h2>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #ddd;">
+            <h3 style="margin-top:0; font-size:1em;">Plan importieren</h3>
+            <div class="form-group">
+                <textarea id="import-code-input" rows="2" placeholder="Export-Code hier einfügen..."></textarea>
+            </div>
+            <button class="btn-small" onclick="importPlan()">Plan importieren</button>
+        </div>
+
         <ul id="saved-plans-list" class="event-list"></ul>
     </div>
 </div>
@@ -208,10 +217,8 @@
 <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
 
 <script>
-    // HIER DEIN PASSWORT FESTLEGEN:
     const PLAN_PASSWORD = "1234";
 
-    // Passwort-Abfrage beim Start
     window.addEventListener('DOMContentLoaded', () => {
         const enteredPwd = prompt("Bitte gib das Passwort für den Trainingsplan ein:");
         if (enteredPwd === PLAN_PASSWORD) {
@@ -289,7 +296,6 @@
         }
     }
 
-    // --- TEMPLATES ---
     const buildWeek = [
         { dayName: 'Montag', type: 'Rest', title: 'Ruhetag', duration: '-', tss: 0, details: [], nutrition: "Ausreichend trinken, kohlenhydratreich essen für die kommenden Einheiten." },
         { dayName: 'Dienstag', type: 'Interval', title: 'VO2 Max Intervalle', duration: '1h 15m', tss: 85, 
@@ -338,7 +344,7 @@
 
     function addEvent() {
         const name = document.getElementById('event-name').value;
-        const dateStr = document.getElementById('event-date').value; // DD.MM.YYYY
+        const dateStr = document.getElementById('event-date').value;
         const dist = parseFloat(document.getElementById('event-dist').value) || 0;
         const elev = parseFloat(document.getElementById('event-elev').value) || 0;
 
@@ -717,12 +723,59 @@
             ul.innerHTML = '<p style="color:var(--text-muted);">Keine gespeicherten Pläne gefunden.</p>';
         } else {
             planNames.forEach(name => {
+                const planData = plans[name];
+                const exportString = btoa(encodeURIComponent(JSON.stringify(planData))); // Clean Base64 Export Code
+
                 const li = document.createElement('li'); li.className = 'event-item';
-                li.innerHTML = `<strong>${name}</strong> <div><button class="btn-small" onclick="loadPlan('${name}')">Laden</button> <button class="btn-delete" onclick="deletePlan('${name}')">Löschen</button></div>`;
+                li.innerHTML = `
+                    <strong>${name}</strong> 
+                    <div>
+                        <button class="btn-small" style="background-color:#17a2b8;" onclick="exportPlanData('${name}')">Export</button>
+                        <button class="btn-small" onclick="loadPlan('${name}')">Laden</button> 
+                        <button class="btn-delete" onclick="deletePlan('${name}')">Löschen</button>
+                    </div>`;
                 ul.appendChild(li);
             });
         }
         document.getElementById('plan-manager-modal').style.display = 'flex';
+    }
+
+    function exportPlanData(name) {
+        let plans = JSON.parse(localStorage.getItem('cyclingPlans') || '{}');
+        let planData = plans[name];
+        if(!planData) return;
+
+        // In komprimierten Base64 String umwandeln zum einfachen Kopieren
+        const jsonStr = JSON.stringify({ name: name, data: planData });
+        const base64Code = btoa(encodeURIComponent(jsonStr));
+
+        navigator.clipboard.writeText(base64Code).then(() => {
+            alert(`Export-Code für "${name}" wurde in die Zwischenablage kopiert!\n\nDu kannst ihn dir jetzt z.B. per WhatsApp oder Mail ans Handy schicken und dort im Plan-Manager importieren.`);
+        }).catch(err => {
+            prompt("Kopiere diesen Export-Code manuell:", base64Code);
+        });
+    }
+
+    function importPlan() {
+        const codeInput = document.getElementById('import-code-input').value.trim();
+        if(!codeInput) return alert("Bitte füge einen Export-Code ein.");
+
+        try {
+            const jsonStr = decodeURIComponent(atob(codeInput));
+            const parsed = JSON.parse(jsonStr);
+
+            if(!parsed.name || !parsed.data) throw new Error("Ungültiges Format");
+
+            let plans = JSON.parse(localStorage.getItem('cyclingPlans') || '{}');
+            plans[parsed.name] = parsed.data;
+            localStorage.setItem('cyclingPlans', JSON.stringify(plans));
+
+            document.getElementById('import-code-input').value = '';
+            openPlanManager(); // Refresh Modal List
+            alert(`Plan "${parsed.name}" erfolgreich importiert! Du kannst ihn jetzt laden.`);
+        } catch(e) {
+            alert("Fehler beim Importieren! Der Code scheint ungültig oder beschädigt zu sein.");
+        }
     }
 
     function closePlanManager() { document.getElementById('plan-manager-modal').style.display = 'none'; }
