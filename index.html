@@ -112,7 +112,7 @@
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="main-container" style="display:none;">
     <div class="header-actions">
         <h1 class="header-title">Dynamischer Cycling Coach <small id="plan-title-display">Neuer (ungespeicherter) Plan</small></h1>
         <div class="nav-buttons">
@@ -143,7 +143,7 @@
             <div class="form-group" style="grid-column: 1 / -1;"><button class="btn-small" onclick="addEvent()">+ Event hinzufügen</button></div>
         </div>
         <ul class="event-list" id="event-list-container"></ul>
-        <button onclick="generatePlan()" style="margin-top: 20px; width: 100%; font-size: 1.1em; padding: 15px;">Trainingsplan (Dynamischer FTP-Aufbau) generieren</button>
+        <button onclick="generatePlan()" style="margin-top: 20px; width: 100%; font-size: 1.1em; padding: 15px;">Trainingsplan (Start ab nächster Woche) generieren</button>
     </div>
 
     <!-- Plan Section -->
@@ -162,7 +162,7 @@
         </div>
 
         <div id="week-calendar" class="week-calendar"></div>
-        <p style="color: var(--text-muted); margin-bottom: 15px;">Das System passt Ruhetage dynamisch an: Fällt durch deine Termine unter der Woche (z. B. Di/Mi) Training aus, wird der Freitag automatisch mit einer sinnvollen Einheit gefüllt, statt starr frei zu sein.</p>
+        <p style="color: var(--text-muted); margin-bottom: 15px;">Der Plan startet immer direkt in der kommenden Woche mit dem kontinuierlichen FTP-Aufbau. Dein Event in der Zukunft dient als automatischer Meilenstein am Ende.</p>
         <div class="plan-grid" id="plan-container"></div>
     </div>
 </div>
@@ -208,6 +208,21 @@
 <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
 
 <script>
+    // HIER DEIN PASSWORT FESTLEGEN:
+    const PLAN_PASSWORD = "1234";
+
+    // Passwort-Abfrage beim Start
+    window.addEventListener('DOMContentLoaded', () => {
+        const enteredPwd = prompt("Bitte gib das Passwort für den Trainingsplan ein:");
+        if (enteredPwd === PLAN_PASSWORD) {
+            document.getElementById('main-container').style.display = 'block';
+            initApp();
+        } else {
+            alert("Falsches Passwort! Zugriff verweigert.");
+            document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px; font-family:sans-serif;'>Zugriff verweigert. Bitte Seite neu laden.</h2>";
+        }
+    });
+
     let currentPlanName = null;
     let currentFtp = 260;
     let currentWeight = 86;
@@ -218,6 +233,32 @@
     
     let activeModalWeekIdx = null;
     let activeModalDayIdx = null;
+
+    let fpInit, fpUpdate;
+
+    function initApp() {
+        fpInit = flatpickr("#input-restdates", { 
+            mode: "multiple", dateFormat: "d.m.Y", locale: "de",
+            onChange: function(selectedDates) {
+                if(isSyncing) return;
+                isSyncing = true; updateGlobalRestDates(selectedDates); fpUpdate.setDate(selectedDates, true); isSyncing = false;
+            }
+        });
+
+        fpUpdate = flatpickr("#update-restdates", { 
+            mode: "multiple", dateFormat: "d.m.Y", locale: "de",
+            onChange: function(selectedDates) {
+                if(isSyncing) return;
+                isSyncing = true; updateGlobalRestDates(selectedDates); fpInit.setDate(selectedDates, true); isSyncing = false;
+            }
+        });
+
+        flatpickr("#event-date", { dateFormat: "d.m.Y", locale: "de" });
+
+        if(localStorage.getItem('cyclingPlans')) {
+            document.getElementById('btn-load').style.display = 'inline-block';
+        }
+    }
 
     function getFormattedDate(dateObj) {
         const y = dateObj.getFullYear(); 
@@ -233,29 +274,11 @@
 
     let isSyncing = false; 
 
-    const fpInit = flatpickr("#input-restdates", { 
-        mode: "multiple", dateFormat: "d.m.Y", locale: "de",
-        onChange: function(selectedDates) {
-            if(isSyncing) return;
-            isSyncing = true; updateGlobalRestDates(selectedDates); fpUpdate.setDate(selectedDates, true); isSyncing = false;
-        }
-    });
-
-    const fpUpdate = flatpickr("#update-restdates", { 
-        mode: "multiple", dateFormat: "d.m.Y", locale: "de",
-        onChange: function(selectedDates) {
-            if(isSyncing) return;
-            isSyncing = true; updateGlobalRestDates(selectedDates); fpInit.setDate(selectedDates, true); isSyncing = false;
-        }
-    });
-
-    flatpickr("#event-date", { dateFormat: "d.m.Y", locale: "de" });
-
     function syncCalendars() {
         const dateObjects = Array.from(allRestDatesSet).map(ds => new Date(ds + 'T00:00:00'));
         isSyncing = true;
-        fpInit.setDate(dateObjects, true);
-        fpUpdate.setDate(dateObjects, true);
+        if(fpInit) fpInit.setDate(dateObjects, true);
+        if(fpUpdate) fpUpdate.setDate(dateObjects, true);
         isSyncing = false;
     }
 
@@ -268,26 +291,25 @@
 
     // --- TEMPLATES ---
     const buildWeek = [
-        { dayName: 'Montag', type: 'Rest', title: 'Ruhetag', duration: '-', tss: 0, details: [], nutrition: "Ausreichend trinken." },
+        { dayName: 'Montag', type: 'Rest', title: 'Ruhetag', duration: '-', tss: 0, details: [], nutrition: "Ausreichend trinken, kohlenhydratreich essen für die kommenden Einheiten." },
         { dayName: 'Dienstag', type: 'Interval', title: 'VO2 Max Intervalle', duration: '1h 15m', tss: 85, 
           details: [ { phase: 'Aufwärmen', time: '15 min', target: 'Zone 1/2', cadence: '90-95 rpm' }, { phase: 'Hauptteil', time: '5 x 3 min', target: '110-115% FTP', cadence: '95+ rpm' }, { phase: 'Cool Down', time: '15 min', target: 'Zone 1', cadence: '85-90 rpm' } ],
-          nutrition: "Vorab: 1 MNSTRY Gel. Währenddessen: 1 Flasche mit MNSTRY Power Carb. Ggf. 1 SaltStick Cap."
+          nutrition: "Vorab: 1 MNSTRY Gel. Währenddessen: 1 Flasche (500-750ml) mit MNSTRY Power Carb. Ggf. 1 SaltStick Cap."
         },
         { dayName: 'Mittwoch', type: 'Endurance', title: 'Grundlagen Ausdauer (LIT)', duration: '2h 00m', tss: 90,
           details: [{ phase: 'Konstante Fahrt', time: '2h', target: '65-75% FTP', cadence: '85-95 rpm' }],
-          nutrition: "Moderate Carb-Zufuhr. Wasser + 1-2 SaltStick Caps/Stunde."
+          nutrition: "Moderate Carb-Zufuhr. Vorwiegend Wasser + 1-2 SaltStick Electrolyte Caps pro Stunde."
         },
         { dayName: 'Donnerstag', type: 'Interval', title: 'Sweetspot Tempo', duration: '1h 30m', tss: 95,
           details: [ { phase: 'Aufwärmen', time: '20 min', target: 'Zone 2', cadence: '90 rpm' }, { phase: 'Hauptteil', time: '3 x 15 min', target: '88-93% FTP', cadence: '85-90 rpm' }, { phase: 'Cool Down', time: '15 min', target: 'Zone 1', cadence: 'frei' } ],
-          nutrition: "1 Flasche mit MNSTRY Power Carb + SaltStick Caps."
+          nutrition: "1 Flasche mit MNSTRY Power Carb (ca. 60g Carbs). 1-2 SaltStick Caps."
         },
-        // Freitag wird dynamisch geprüft: Ist frei, es sei denn unter der Woche fiel Training aus!
         { dayName: 'Freitag', type: 'Rest', title: 'Aktive Erholung / Ruhetag', duration: '-', tss: 0,
           details: [], nutrition: "Erholungstag vor der langen Ausfahrt."
         },
         { dayName: 'Samstag', type: 'Endurance', title: 'Lange Ausfahrt', duration: '3h 30m', tss: 170,
           details: [{ phase: 'Ausdauer', time: '3h 30m', target: '60-70% FTP', cadence: '85-90 rpm' }],
-          nutrition: "High-Carb Fokus: 60-90g Carbs/Stunde! MNSTRY Power Carb + Gels + SaltStick."
+          nutrition: "High-Carb Fokus: 60-90g Carbs pro Stunde! MNSTRY Power Carb in Flaschen + 1 MNSTRY Gel/Stunde + SaltStick."
         },
         { dayName: 'Sonntag', type: 'Endurance', title: 'Recovery Ride', duration: '1h', tss: 30, 
           details: [{ phase: 'Kaffeefahrt', time: '1h', target: 'Zone 1', cadence: 'frei' }], nutrition: "Nur Wasser." }
@@ -313,10 +335,6 @@
         { dayName: 'Sonntag', type: 'Endurance', title: 'Belohnungs-Ausfahrt', duration: '2h', tss: 80, 
           details: [{ phase: 'Genießen', time: '2h', target: 'Zone 1/2', cadence: 'frei' }], nutrition: "Wasser, SaltStick Caps." }
     ];
-
-    window.onload = function() {
-        if(localStorage.getItem('cyclingPlans')) document.getElementById('btn-load').style.display = 'inline-block';
-    };
 
     function addEvent() {
         const name = document.getElementById('event-name').value;
@@ -383,14 +401,11 @@
                 return evTime >= wStart && evTime <= wEndTime;
             });
 
-            // 1. Zuerst prüfen, wie viele Tage in dieser Woche vom Nutzer blockiert wurden (Di-Do)
             let weekCheckDate = new Date(currentDate.getTime());
             let userRestDaysInWeek = 0;
             for (let i = 0; i < 7; i++) {
                 if (allRestDatesSet.has(getFormattedDate(weekCheckDate))) {
-                    if (i > 0 && i < 4) { // Di (1), Mi (2), Do (3)
-                        userRestDaysInWeek++;
-                    }
+                    if (i > 0 && i < 4) { userRestDaysInWeek++; }
                 }
                 weekCheckDate.setDate(weekCheckDate.getDate() + 1);
             }
@@ -403,9 +418,6 @@
 
             let activeTemplate = isTestWeek ? testWeek : JSON.parse(JSON.stringify(buildWeek));
 
-            // DYNAMISCHE ANPASSUNG DES FREITAGS:
-            // Wenn der Nutzer unter der Woche (Di-Do) bereits 2 oder mehr Tage nicht trainieren kann,
-            // macht der Ruhetag am Freitag keinen Sinn mehr -> Freitag wird zur Grundlageneinheit!
             if (!isTestWeek && !eventInThisWeek && userRestDaysInWeek >= 2) {
                 activeTemplate[4] = { 
                     dayName: 'Freitag', type: 'Endurance', title: 'Ersatz-Ausfahrt (Ausgleich)', duration: '1h 30m', tss: 65,
@@ -417,12 +429,12 @@
             let activeTrainingDaysThisWeek = 0;
 
             for (let d = 0; d < 7; d++) {
-                const dateStrForCheck = getFormattedDate(currentDate); // YYYY-MM-DD
+                const dateStrForCheck = getFormattedDate(currentDate);
                 const isRestDay = allRestDatesSet.has(dateStrForCheck);
                 
                 let dayData = JSON.parse(JSON.stringify(activeTemplate[d]));
                 dayData.dateString = dateStrForCheck;
-                dayData.displayDate = currentDate.toLocaleDateString('de-DE'); // DD.MM.YYYY
+                dayData.displayDate = currentDate.toLocaleDateString('de-DE');
                 dayData.morningCheck = dayData.morningCheck || null;
 
                 if (eventInThisWeek) {
@@ -446,7 +458,6 @@
                     }
                 }
 
-                // Event-Tag Match
                 let matchingEvent = events.find(ev => ev.isoDate === dateStrForCheck || ev.dateStr === dayData.displayDate);
                 if (matchingEvent) {
                     dayData.type = 'Race';
@@ -748,7 +759,7 @@
         updateWkgDisplay(); 
         closePlanManager(); 
         showPlanUI(); 
-        document.getElementById('btn-save').classList.add('hidden'); // Erst bei Änderung speichern
+        document.getElementById('btn-save').classList.add('hidden');
         
         let todayStr = getFormattedDate(new Date()); activeWeekIndex = 0;
         generatedWeeks.forEach((w, i) => { if(todayStr >= w.startDate && todayStr <= w.endDate) activeWeekIndex = i; });
